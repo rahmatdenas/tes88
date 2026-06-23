@@ -69,8 +69,16 @@ function doPreProcessing() {
 }
 
 function populateProvinceTypesData() {
+  
+  // === TANGKAP INPUT PENGGUNA ===
+  let inputTxt = document.getElementById('jenis-input').value.trim();
+  
+  // === SUNTIKKAN KE SPARQL ===
+  let dynamicQuery = SPARQL_QUERY_0.replace('<PLACEHOLDER_JENIS>', inputTxt);
+
+  // === JALANKAN KUERI DINAMIS ===
   return queryWdqsThenProcess(
-    SPARQL_QUERY_0,
+    dynamicQuery, // Kita gunakan kueri yang sudah disuntik, bukan SPARQL_QUERY_0 asli
     function(result) {
       let qid = result.siteQid.value;
       if (!(qid in Records)) {

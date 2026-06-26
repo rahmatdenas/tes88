@@ -158,14 +158,14 @@ const KUMPULAN_KUERI_0 = {
      <PLACEHOLDER_WILAYAH_1>
       ?p131Lokasi wdt:P131* ?provinsi .
       ?site wdt:P31 ?jenis ;
-            wdt:P276 ?lokasi .
+            wdt:P2341 ?lokasi .
       ?lokasi wdt:P131 ?p131Lokasi .
     }
     UNION
     {
       <PLACEHOLDER_WILAYAH_2>
       ?site wdt:P31 ?jenis ;
-            wdt:P276 ?lokasi .
+            wdt:P2341 ?lokasi .
       ?lokasi wdt:P131 ?p131Lokasi .
     }
     
@@ -261,7 +261,7 @@ const KUMPULAN_KUERI_1 = {
   }`,
   'bahasa': `SELECT DISTINCT ?siteQid ?coord WHERE {
     VALUES ?site { <PLACEHOLDER_QIDS> }
-    ?site wdt:P276 ?lokasi .
+    ?site wdt:P2341 ?lokasi .
     ?lokasi p:P625 ?coordStatement .
     ?coordStatement ps:P625 ?coord .
     FILTER NOT EXISTS { ?coordStatement pq:P518 ?x }

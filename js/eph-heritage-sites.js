@@ -135,28 +135,55 @@ function populateProvinceTypesData() {
   // 1. Tentukan kategori dan simpan di ingatan global
   currentKategoriUtama = tentukanKategoriKueri(inputTxt);
   
-  // 2. Ambil kueri dari Kamus. Jika 'alam', pinjam kueri 'general' (karena butuh P131+ juga)
+  // 2. Ambil kueri dari Kamus. Jika 'alam', pinjam kueri 'general'
   let namaKueri = (currentKategoriUtama === 'alam') ? 'general' : currentKategoriUtama;
-  let baseQuery = KUMPULAN_KUERI_0[namaKueri];
   
-  // 3. Suntikkan Dropdown Wilayah dengan Logika UNION Skenario 1 dan 2
-let wilayahClause1 = '';
-  let wilayahClause2 = '';
+  // Fallback pengaman: jika namaKueri belum ada di KUMPULAN_KUERI_0, pakai 'general'
+  let baseQuery = KUMPULAN_KUERI_0[namaKueri] || KUMPULAN_KUERI_0['general'];
+  
+  // 3. Suntikkan Dropdown Wilayah dengan Logika UNION
+  let wilayahClause1 = '';
+  let unionEkstra = ''; 
   
   if (provInput === 'all') {
     wilayahClause1 = '?provinsi wdt:P31 wd:Q5098 .';
-    wilayahClause2 = 'BIND(wd:Q252 AS ?p131Lokasi)';
+    // Jika 'all', unionEkstra biarkan kosong
   } else {
     wilayahClause1 = `?provinsi wdt:P131 ${provInput}.`;
-    wilayahClause2 = `BIND(${provInput} AS ?provinsi) BIND(${provInput} AS ?p131Lokasi)`; // <-- Perbaikan di sini
+    let wilayahClause2 = `BIND(${provInput} AS ?provinsi) BIND(${provInput} AS ?p131Lokasi)`; 
+    
+    // --- KAMUS PROPERTI LOKASI ---
+    // Di sinilah keajaibannya, cukup tambahkan di sini jika ada kategori baru
+    const petaProperti = {
+      'general': 'P131',
+      'pers': 'P159',
+      'publikasi': 'P291',
+      'fiksi': 'P840',
+      'tokoh': 'P19',
+      'bahasa': 'P2341',
+      'lokasi': 'P276'
+    };
+    
+    // Ambil P-ID sesuai namaKueri. Jika tidak ada di kamus, otomatis pakai default 'P131'
+    let propLokasi = petaProperti[namaKueri] || 'P131'; 
+    
+    // Rakit blok UNION dinamis menggunakan propLokasi yang sudah terpilih
+    unionEkstra = `
+    UNION {
+      ${wilayahClause2}
+      ?site wdt:P31 ?jenis ;
+            wdt:${propLokasi} ?p131Lokasi .
+    }`;
   }
   
-  // 4. Rakit kueri final (Gunakan regex /.../g untuk memastikan semua instans terganti)
+  // 4. Rakit kueri final 
   let dynamicQuery = baseQuery
     .replace(/<PLACEHOLDER_WILAYAH_1>/g, wilayahClause1)
-    .replace(/<PLACEHOLDER_WILAYAH_2>/g, wilayahClause2)
+    .replace(/<PLACEHOLDER_UNION_EKSTRA>/g, unionEkstra) 
     .replace(/<PLACEHOLDER_JENIS>/g, inputTxt);
-console.log("Kueri yang dikirim ke Wikidata:", dynamicQuery); // Lihat hasilnya di F12 -> Console
+
+  console.log("Kueri yang dikirim ke Wikidata:", dynamicQuery); 
+
   return queryWdqsThenProcess(
     dynamicQuery,
     function(result) {
@@ -167,7 +194,7 @@ console.log("Kueri yang dikirim ke Wikidata:", dynamicQuery); // Lihat hasilnya 
       record.title = ('siteLabel' in result && result.siteLabel.value) ? result.siteLabel.value : '[ERROR: No title]';
 
       let provQid = result.provinsiQid ? result.provinsiQid.value : 'Q_UNKNOWN';
-let provLabel = result.provinsiLabel ? result.provinsiLabel.value : 'Tidak dalam Provinsi';
+      let provLabel = result.provinsiLabel ? result.provinsiLabel.value : 'Tidak dalam Provinsi';
 
       if (!(provQid in ProvinceIndex)) {
         ProvinceIndex[provQid] = new ProvinceIndexEntry();

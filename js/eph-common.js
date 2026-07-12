@@ -33,6 +33,7 @@ var activeXhrs            = [];
 var currentActiveShapeLayer = null;
 var lastValidHash   = 'landing';
 var isRevertingHash = false;
+var searchDebounceToken = null;
 
 window.addEventListener('load', init);
 

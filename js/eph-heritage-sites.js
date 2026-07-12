@@ -814,39 +814,40 @@ function populateMapAndIndex() {
         [record.lat, record.lon],
         { icon: L.ExtraMarkers.icon({ icon: '', markerColor : 'orange-dark' }) }
       );
-record.mapMarker = mapMarker;
+rrecord.mapMarker = mapMarker;
       
       mapMarker.bindPopup(record.title, { 
         closeButton: false,
         maxWidth: 200,
-        togglePopup: false // <--- WAJIB: Agar klik kedua tidak menutup popup
+        togglePopup: false 
       });
 
       // =======================================================
-      // +++ LOGIKA KLIK KEDUA (TRIK JEDA LEAFLET) +++
+      // +++ LOGIKA KLIK KEDUA (PENGUNCI STATUS) +++
       // =======================================================
       
-      // A. Saat popup terbuka, tandai bahwa ia "Baru Saja Dibuka"
+      // Kita buat bendera status langsung di objek marker
+      mapMarker._statusPopup = 'tertutup'; // Status awal
+
       mapMarker.on('popupopen', function() {
-        this._baruSajaDibuka = true;
-        
-        // Setelah 300 milidetik, hapus tandanya (berarti sudah siap untuk klik kedua)
-        setTimeout(() => {
-          this._baruSajaDibuka = false;
-        }, 300);
+        // Saat terbuka, kita beri jeda sebentar agar klik pertama tidak dianggap klik kedua
+        this._statusPopup = 'terbuka'; 
       });
 
-      // B. Saat marker diklik, lakukan pengecekan
+      mapMarker.on('popupclose', function() {
+        this._statusPopup = 'tertutup';
+      });
+
       mapMarker.on('click', function() {
-        
-        // Cek: Apakah popupnya sudah terbuka? DAN apakah usianya sudah lebih dari 300ms?
-        // Jika _baruSajaDibuka bernilai FALSE, berarti ini SAH adalah klik kedua!
-        if (this.isPopupOpen() && this._baruSajaDibuka === false) {
+        // Jika statusnya terbuka, itu berarti ini adalah KLIK KEDUA
+        if (this._statusPopup === 'terbuka') {
           
-          // Tarik panel mobile ke atas
-          if (typeof window.setMobilePanelExpanded === 'function') {
-            window.setMobilePanelExpanded(true);
-          }
+          // TARIK PANEL KE ATAS (Gunakan setTimeout kecil agar tidak bentrok dengan Leaflet)
+          setTimeout(() => {
+            if (typeof window.setMobilePanelExpanded === 'function') {
+              window.setMobilePanelExpanded(true);
+            }
+          }, 100);
           
         }
       });

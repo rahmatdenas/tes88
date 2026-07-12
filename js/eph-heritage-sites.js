@@ -45,36 +45,45 @@ function formatWikidataDate(dateString, precision) {
 }
 
 function loadPrimaryData() {
+  let tiketPencarianIni = currentSearchToken;
   doPreProcessing();
 
-  populateProvinceTypesData() 
+populateProvinceTypesData() 
     .then(() => {
-      return populateCoordinatesData().then(populateMapAndIndex);
+      // Gerbang 1: Cek sebelum memproses koordinat
+      if (currentSearchToken !== tiketPencarianIni) throw 'ABORTED';
+      
+      return populateCoordinatesData().then(() => {
+         // Gerbang 2: Cek sebelum menyuntikkan data ke Peta dan Daftar HTML
+         if (currentSearchToken !== tiketPencarianIni) throw 'ABORTED';
+         populateMapAndIndex();
+      });
     })
     .then(() => {
+      if (currentSearchToken !== tiketPencarianIni) throw 'ABORTED';
+      
       enableApp(); 
       populateImageAndWikipediaData()
         .then(() => {
+          // Gerbang 3: Cek sebelum memproses gambar/artikel di background
+          if (currentSearchToken !== tiketPencarianIni) return; 
+          
           applyIntersectionFilter(); 
           Object.values(Records).forEach(r => r.panelElem = undefined);          
           processHashChange();
         })
         .catch(error => {
-          if (error === 'ABORTED') return;
-          
+          if (error === 'ABORTED' || currentSearchToken !== tiketPencarianIni) return;
           console.warn("Gagal mengambil data Gambar/Wikipedia dari server.", error);
-          applyIntersectionFilter();             
-          Object.values(Records).forEach(r => r.panelElem = undefined);
-          processHashChange();
+          // ... (sisa kode catch Anda) ...
         });
     })
-    // ==========================================
-    // PERBAIKAN DI BLOK CATCH INI
-    // ==========================================
-.catch(error => {
+    .catch(error => {
+       // KUNCI: Karena kita melempar (throw) 'ABORTED' dari gerbang di atas, 
+       // error tersebut akan ditangkap di sini dan diabaikan dengan aman tanpa merusak UI.
        if (error === 'ABORTED') {
-         console.log("Pencarian dibatalkan secara paksa. Kembali ke Beranda.");
-         return;
+         console.log("Pencarian dibatalkan atau diganti. Data kadaluarsa dibuang.");
+         return; 
        }
 
        // 1. Matikan status memuat agar animasi berhenti
@@ -1092,17 +1101,41 @@ let tautanSuntingRingkasan = `<a href="${wikiUrlUtama}" target="_blank" class="s
 let designationsHtml = `<h2 style="margin-top:10px"><span id="header-text-${qid}">Informasi</span> ${tautanSuntingRingkasan}</h2>`;
 designationsHtml += '<ul class="designations">';
 
-  // Siapkan daftar provinsi & Lokasi
-  let arrayProvinsi = Object.values(record.designations).filter(p => p !== 'Tidak dalam Provinsi');
-  if (arrayProvinsi.length === 0) arrayProvinsi.push('Indonesia');
-  let teksDaftarProvinsi = arrayProvinsi.join(', '); 
+ // ==========================================
+  // SIAPKAN DAFTAR PROVINSI & LOKASI SPESIFIK
+  // ==========================================
+  let arrayProvinsi = Object.values(record.designations);
+  
+  // Deteksi jika item ini tidak memiliki provinsi yang terdata
+  let isTidakSpesifik = arrayProvinsi.includes('Tidak dalam Provinsi') || arrayProvinsi.length === 0;
 
   let spesifik = record.lokasiSpesifik; 
-  if (spesifik === 'Tidak dalam Provinsi') spesifik = null;
+  // Bersihkan nilai anomali dari Wikidata
+  if (spesifik === 'Tidak dalam Provinsi' || spesifik === 'Q_UNKNOWN') spesifik = null;
 
-  let namaLokasi = teksDaftarProvinsi;
-  if (spesifik && !arrayProvinsi.map(p => p.toLowerCase()).includes(spesifik.toLowerCase())) {
-    namaLokasi = `${spesifik}, ${teksDaftarProvinsi}`; 
+  let namaLokasi = '';
+
+  if (isTidakSpesifik) {
+    // KONDISI 1: PROVINSI TIDAK DIKETAHUI
+    if (spesifik) {
+      // Hanya tampilkan lokasi spesifiknya saja (tanpa sufix apapun)
+      namaLokasi = spesifik;
+    } else {
+      // Jika lokasi spesifik juga kosong, gunakan teks pengganti baru
+      namaLokasi = 'Wilayah Lainnya/Tidak Spesifik';
+    }
+  } else {
+    // KONDISI 2: PROVINSI DIKETAHUI (Misal: Jawa Barat, Bali)
+    // Saring agar teks 'Tidak dalam Provinsi' tidak ikut tercetak jika ada provinsi ganda
+    let arrayProvinsiBersih = arrayProvinsi.filter(p => p !== 'Tidak dalam Provinsi');
+    let teksDaftarProvinsi = arrayProvinsiBersih.join(', '); 
+    
+    // Gabungkan dengan lokasi spesifik jika ada dan namanya tidak sama persis dengan provinsi
+    if (spesifik && !arrayProvinsiBersih.map(p => p.toLowerCase()).includes(spesifik.toLowerCase())) {
+      namaLokasi = `${spesifik}, ${teksDaftarProvinsi}`; 
+    } else {
+      namaLokasi = teksDaftarProvinsi;
+    }
   }
 
   // ==========================================
@@ -1332,18 +1365,19 @@ function displayArticleExtract(title, elem) {
     exintro: 1,
     redirects: true,
     titles: title,
-    origin: '*' // Kunci wajib agar terhindar dari blokir keamanan CORS browser
+    origin: '*' 
   };
   Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
 
-  // 2. Eksekusi Fetch API
-  fetch(url)
+  // =========================================================
+  // 2. TAMBAHKAN SIGNAL KE DALAM FETCH WIKIPEDIA
+  // =========================================================
+  fetch(url, { signal: globalFetchController.signal })
     .then(response => {
       if (!response.ok) throw new Error('Koneksi ke server Wikipedia gagal');
       return response.json();
     })
     .then(data => {
-      // Proteksi jika data Wikipedia kosong/tidak valid
       if (!data.query || !data.query.pages) {
         throw new Error('Struktur data Wikipedia tidak ditemukan');
       }
@@ -1362,25 +1396,35 @@ function displayArticleExtract(title, elem) {
         paragrafPilihan = '<p>Ringkasan artikel belum memadai.</p>'; 
       }
 
-      // Cetak hasil ke dalam HTML
-      elem.innerHTML =
-        paragrafPilihan +
-        '<p class="wikipedia-link">' +
-          `<a href="https://id.wikipedia.org/wiki/${encodeURIComponent(title)}" target="_blank">` +
-            '<img src="img/wikipedia_tiny_logo.png" alt="" />' +
-            '<span>Baca selengkapnya di Wikipedia</span>' +
-          '</a>' +
-        '</p>';
-        
-      // Matikan animasi loading dengan menghapus class
-      elem.classList.remove('loading');
+      // KUNCI PENGAMAN LAPIS KEDUA: Pastikan elemen HTML-nya masih ada sebelum diisi!
+      if (elem) {
+        elem.innerHTML =
+          paragrafPilihan +
+          '<p class="wikipedia-link">' +
+            `<a href="https://id.wikipedia.org/wiki/${encodeURIComponent(title)}" target="_blank">` +
+              '<img src="img/wikipedia_tiny_logo.png" alt="" />' +
+              '<span>Baca selengkapnya di Wikipedia</span>' +
+            '</a>' +
+          '</p>';
+          
+        elem.classList.remove('loading');
+      }
     })
     .catch(error => {
+      // =========================================================
+      // 3. CEGAT ERROR ABORT AGAR TIDAK MERUSAK UI
+      // =========================================================
+      if (error.name === 'AbortError') {
+        console.log('Penarikan Wikipedia dibatalkan (reset).');
+        return; // Matikan dengan tenang
+      }
+
       console.error('Gagal memuat artikel Wikipedia:', error);
       
-      // JIKA GAGAL: Beri pesan error dan MATIKAN animasi loading
-      elem.innerHTML = '<p class="nodata" style="color:#cc0000; margin-top:10px;">Gagal memuat ringkasan artikel. Periksa koneksi internet Anda.</p>';
-      elem.classList.remove('loading');
+      if (elem) {
+        elem.innerHTML = '<p class="nodata" style="color:#cc0000; margin-top:10px;">Gagal memuat ringkasan artikel. Periksa koneksi internet Anda.</p>';
+        elem.classList.remove('loading');
+      }
     });
 }
 
@@ -1416,9 +1460,21 @@ if (scrollContainer) {
 
 function queryOsm(qid) {
   let xhr = new XMLHttpRequest();
+  
+  // =========================================================
+  // 1. DAFTARKAN XHR INI KE SATPAM PEMBUNUH KONEKSI
+  // =========================================================
+  activeXhrs.push(xhr);
+
   xhr.onreadystatechange = function() {
     if (xhr.readyState !== xhr.DONE) return;
     
+    // =========================================================
+    // 2. HAPUS DARI DAFTAR JIKA SUDAH SELESAI
+    // =========================================================
+    let index = activeXhrs.indexOf(xhr);
+    if (index > -1) activeXhrs.splice(index, 1);
+
     if (xhr.status === 200) {
       let geoJson = osmtogeojson(JSON.parse(xhr.responseText));
       if (!geoJson || geoJson.features.length === 0) return;
@@ -1433,13 +1489,17 @@ function queryOsm(qid) {
       
       Records[qid].shapeLayer = shapeLayer;
 
-      // KUNCI PERBAIKAN: Pastikan halaman belum pindah sebelum menggambar
+      // Logika Anda di sini sudah cukup aman (mengecek hash)
       if (window.location.hash.replace('#', '') === qid) {
         if (currentActiveShapeLayer) Map.removeLayer(currentActiveShapeLayer);
         shapeLayer.addTo(Map);
         currentActiveShapeLayer = shapeLayer;
         Map.fitBounds(shapeLayer.getBounds());
       }
+    }
+    else if (xhr.status === 0) {
+      // 3. JIKA STATUS 0 (DIBATALKAN MANUAL OLEH RESET APP)
+      console.log('Penarikan poligon peta dibatalkan.');
     }
     else {
       console.log('ERROR loading from Overpass API', xhr);

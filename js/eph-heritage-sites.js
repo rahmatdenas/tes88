@@ -1674,7 +1674,6 @@ function queryOsm(qid) {
         if (currentActiveShapeLayer) Map.removeLayer(currentActiveShapeLayer);
         shapeLayer.addTo(Map);
         currentActiveShapeLayer = shapeLayer;
-        Map.fitBounds(shapeLayer.getBounds());
       }
     }
     else if (xhr.status === 0) {

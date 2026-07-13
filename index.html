@@ -372,7 +372,6 @@
     <div class="filter-box" style="grid-column: span 2; min-width: 0;">
       <select id="filter-region" style="width: 100%;">
         <option value="all">Semua Wilayah</option>
-        <option value="terdekat">Sekitar Anda (10 km)</option>
       </select>
     </div>
 
@@ -435,9 +434,18 @@ Mari berkontribusi mendokumentasikan dan menghimpun sejarah masjid di Sumatera B
   </section>
 <nav id="navigasi-utama">
     <ul id="nav-standar" style="display: flex; list-style: none; margin: 0 20px; padding: 0;">
-      <li style="flex: 1; text-align: left;"><a href="#">Beranda</a></li>
-      <li style="flex: 1; text-align: center;"><a href="#hasil">Pilih Hasil</a></li>
-      <li style="flex: 1; text-align: right;"><a href="#about">Tentang</a></li>
+      <li class="nav-tab" style="flex: 1; text-align: left; position: relative;">
+        <a id="btn-menu-induk" style="cursor: pointer;">Menu</a>
+        
+        <ul id="submenu-atas" style="display: none; position: absolute; bottom: 150%; left: 0; background: #882222; padding: 12px; margin: 0; border-radius: 8px; list-style: none; flex-direction: column; gap: 12px; min-width: 140px; box-shadow: 0 -4px 10px rgba(0,0,0,0.2); z-index: 999;">
+          <li><a href="#" style="color: white; text-decoration: none; display: block;">Beranda</a></li>
+          <li><a href="#tutorial" style="color: white; text-decoration: none; display: block;">Tutorial</a></li>
+          <li><a href="#medsos" style="color: white; text-decoration: none; display: block;">Media Sosial</a></li>
+        </ul>
+      </li>
+
+      <li class="nav-tab" style="flex: 1; text-align: center;"><a href="#hasil">Pilih Hasil</a></li>
+      <li class="nav-tab" style="flex: 1; text-align: right;"><a href="#about">Tentang</a></li>
     </ul>
 
     <ul id="nav-detail" style="display: none; list-style: none; margin: 0 20px; padding: 0;">

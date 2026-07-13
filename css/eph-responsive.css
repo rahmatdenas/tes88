@@ -33,6 +33,11 @@
     flex: none;
   }
 
+   .panel-content, 
+  #index-list {
+        padding-bottom:32px;
+    }
+
   /* Peta selalu berukuran penuh dari awal (tidak pernah
      display:none) agar Leaflet tidak salah hitung ukuran
      tile, dan langsung tampil sebagai latar belakang. */

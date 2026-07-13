@@ -50,8 +50,8 @@ body {
   display: flex;
   flex-direction: column;
   flex: 0 1 500px;
-padding-bottom: 32px;
   background: #822;
+   height: 100%
 }
 
 #navigasi-utama {
